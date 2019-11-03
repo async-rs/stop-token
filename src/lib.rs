@@ -65,7 +65,7 @@
 //! # Lineage
 //!
 //! The cancellation system is a subset of `C#` [`CancellationToken / CancellationTokenSource`](https://docs.microsoft.com/en-us/dotnet/standard/threading/cancellation-in-managed-threads).
-//! The `StopToken / StopTokenSource` terminology is from C++ paper P0660: https://wg21.link/p0660.
+//! The `StopToken / StopTokenSource` terminology is borrowed from C++ paper P0660: https://wg21.link/p0660.
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
