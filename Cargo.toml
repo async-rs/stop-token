@@ -1,0 +1,16 @@
+[package]
+name = "stop-token"
+version = "0.1.0"
+authors = ["Aleksey Kladov <aleksey.kladov@gmail.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/async-rs/stop-token"
+
+description = "Experimental cooperative cancellation for async-std"
+
+[dependencies]
+pin-project-lite = "0.1.0"
+async-std = "0.99"
+
+[features]
+unstable = ["async-std/unstable"]
