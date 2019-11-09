@@ -101,7 +101,7 @@ pub struct StopToken {
 
 impl Default for StopSource {
     fn default() -> StopSource {
-        let (sender, receiver) = channel::<Never>(0);
+        let (sender, receiver) = channel::<Never>(1);
 
         StopSource {
             _chan: sender,
