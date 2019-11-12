@@ -1,6 +1,6 @@
 [package]
 name = "stop-token"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Aleksey Kladov <aleksey.kladov@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -10,7 +10,7 @@ description = "Experimental cooperative cancellation for async-std"
 
 [dependencies]
 pin-project-lite = "0.1.0"
-async-std = "0.99"
+async-std = "1.0"
 
 [features]
 unstable = ["async-std/unstable"]
