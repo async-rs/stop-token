@@ -10,7 +10,7 @@ description = "Experimental cooperative cancellation for async-std"
 
 [dependencies]
 pin-project-lite = "0.1.0"
-async-std = { path = "../async-std", version = "1.4.0", default-features = false, features = ["unstable"]}
+async-std = { version = "1.4.0", default-features = false, features = ["unstable"]}
 
 [features]
 runtime = ["async-std/default"]
