@@ -67,11 +67,12 @@
 //! The cancellation system is a subset of `C#` [`CancellationToken / CancellationTokenSource`](https://docs.microsoft.com/en-us/dotnet/standard/threading/cancellation-in-managed-threads).
 //! The `StopToken / StopTokenSource` terminology is borrowed from C++ paper P0660: https://wg21.link/p0660.
 
+use futures::stream::Stream;
+use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use async_std::prelude::*;
-use async_std::sync::{channel, Receiver, Sender};
+use async_channel::{bounded, Receiver, Sender};
 use pin_project_lite::pin_project;
 
 enum Never {}
@@ -101,7 +102,7 @@ pub struct StopToken {
 
 impl Default for StopSource {
     fn default() -> StopSource {
-        let (sender, receiver) = channel::<Never>(1);
+        let (sender, receiver) = bounded::<Never>(1);
 
         StopSource {
             _chan: sender,

@@ -10,7 +10,9 @@ description = "Experimental cooperative cancellation for async-std"
 
 [dependencies]
 pin-project-lite = "0.1.0"
-async-std = "1.0"
+async-channel = "1.1.1"
+futures = "0.3.5"
 
-[features]
-unstable = ["async-std/unstable"]
+
+[dev-dependencies]
+async-std = "1.0"
