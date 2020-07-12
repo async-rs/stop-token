@@ -67,15 +67,17 @@
 //! The cancellation system is a subset of `C#` [`CancellationToken / CancellationTokenSource`](https://docs.microsoft.com/en-us/dotnet/standard/threading/cancellation-in-managed-threads).
 //! The `StopToken / StopTokenSource` terminology is borrowed from C++ paper P0660: https://wg21.link/p0660.
 
-use futures::stream::Stream;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::task::{Context, Poll};
 
-use async_channel::{bounded, Receiver, Sender};
+use event_listener::Event;
+use futures::stream::Stream;
 use pin_project_lite::pin_project;
-
-enum Never {}
 
 /// `StopSource` produces `StopToken` and cancels all of its tokens on drop.
 ///
@@ -87,27 +89,43 @@ enum Never {}
 /// schedule_some_work(stop_token);
 /// drop(stop_source); // At this point, scheduled work notices that it is canceled.
 /// ```
+
+#[derive(Debug)]
+struct CondVar {
+    event: Event,
+    signaled: AtomicBool,
+}
+
 #[derive(Debug)]
 pub struct StopSource {
-    /// Solely for `Drop`.
-    _chan: Sender<Never>,
+    signal: Arc<CondVar>,
     stop_token: StopToken,
 }
 
 /// `StopToken` is a future which completes when the associated `StopSource` is dropped.
 #[derive(Debug, Clone)]
 pub struct StopToken {
-    chan: Receiver<Never>,
+    signal: Arc<CondVar>,
 }
 
 impl Default for StopSource {
     fn default() -> StopSource {
-        let (sender, receiver) = bounded::<Never>(1);
-
+        let signal = Arc::new(CondVar {
+            event: Event::new(),
+            signaled: AtomicBool::new(false),
+        });
         StopSource {
-            _chan: sender,
-            stop_token: StopToken { chan: receiver },
+            signal: signal.clone(),
+            stop_token: StopToken { signal },
         }
+    }
+}
+
+impl Drop for StopSource {
+    fn drop(&mut self) {
+        // This can probably be `Relaxed` and notify_relaxed
+        self.signal.signaled.store(true, Ordering::SeqCst);
+        self.signal.event.notify(usize::MAX);
     }
 }
 
@@ -128,12 +146,20 @@ impl StopSource {
 impl Future for StopToken {
     type Output = ();
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        let chan = Pin::new(&mut self.chan);
-        match Stream::poll_next(chan, cx) {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        // We probably need to register this event listener before checking the flag
+        // to prevent race conditions
+        let mut event = self.signal.event.listen();
+
+        // This can also probably be `Relaxed`
+        if self.signal.signaled.load(Ordering::SeqCst) {
+            return Poll::Ready(());
+        }
+
+        let event = Pin::new(&mut event);
+        match Future::poll(event, cx) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(never)) => match never {},
-            Poll::Ready(None) => Poll::Ready(()),
+            Poll::Ready(_) => Poll::Ready(()),
         }
     }
 }
