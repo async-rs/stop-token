@@ -69,8 +69,9 @@
 
 use std::future::Future;
 use std::pin::Pin;
+use std::ptr::null_mut;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicPtr, Ordering},
     Arc,
 };
 use std::task::{Context, Poll};
@@ -94,6 +95,8 @@ use pin_project_lite::pin_project;
 /// a custom implementation of a CondVar that short-circuits after
 /// being signaled once
 struct ShortCircuitingCondVar {
+    // TODO: is there a better (safer) way to have an atomic `Option`?
+    cached_listener: AtomicPtr<EventListener>, // This is a raw pointer to a Box
     event: Event,
     signaled: AtomicBool,
 }
@@ -112,8 +115,18 @@ impl ShortCircuitingCondVar {
             return None; // The `CondVar` has already been triggered so we don't need to wait
         }
 
-        // Register a new listener
-        let listener = self.event.listen();
+        let ptr = self.cached_listener.swap(null_mut(), Ordering::SeqCst);
+
+        let listener = if ptr.is_null() {
+            // Register a new listener
+            self.event.listen()
+        } else {
+            // turn the cached listener back into a `EventListener` object
+
+            // Safety: the `cached_listener` is not null and can only come from a Box::into_raw
+            // it is also replaced with a `null` pointer when read so there can not be another owner.
+            unsafe { *Box::from_raw(ptr) }
+        };
 
         // Make sure the `CondVar` still has not been triggered to prevent race conditions
         if self.signaled.load(Ordering::SeqCst) {
@@ -121,6 +134,33 @@ impl ShortCircuitingCondVar {
         }
 
         Some(listener)
+    }
+
+    fn cache_listener(&self, listener: EventListener) -> Result<(), EventListener> {
+        // Check if there is already a cached listener
+        if self.cached_listener.load(Ordering::SeqCst).is_null() {
+            let listener = Box::new(listener);
+
+            unsafe {
+                let res = self.cached_listener.compare_and_swap(
+                    null_mut(),
+                    Box::into_raw(listener),
+                    Ordering::SeqCst,
+                );
+                if res.is_null() {
+                    Ok(())
+                } else {
+                    // We failed to write our new cached listener due to a race
+                    // Turn it back into a Box and return it to the caller
+
+                    // Safety: the `cached_listener` is not null and can only come from a Box::into_raw
+                    // it is also replaced with a `null` pointer when read so there can not be another owner.
+                    Err(*Box::from_raw(res))
+                }
+            }
+        } else {
+            Err(listener)
+        }
     }
 }
 
@@ -139,6 +179,7 @@ pub struct StopToken {
 impl Default for StopSource {
     fn default() -> StopSource {
         let signal = Arc::new(ShortCircuitingCondVar {
+            cached_listener: AtomicPtr::new(null_mut()),
             event: Event::new(),
             signaled: AtomicBool::new(false),
         });
@@ -175,10 +216,16 @@ impl Future for StopToken {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         if let Some(mut listener) = self.signal.listen() {
-            match Future::poll(Pin::new(&mut listener), cx) {
+            let result = match Future::poll(Pin::new(&mut listener), cx) {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(_) => Poll::Ready(()),
-            }
+            };
+
+            // Try to cache the listener, if there already is a cached listener
+            // drop the one we have
+            let _ = self.signal.cache_listener(listener);
+
+            return result;
         } else {
             Poll::Ready(())
         }
