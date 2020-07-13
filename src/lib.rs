@@ -75,7 +75,7 @@ use std::sync::{
 };
 use std::task::{Context, Poll};
 
-use event_listener::Event;
+use event_listener::{Event, EventListener};
 use futures::stream::Stream;
 use pin_project_lite::pin_project;
 
@@ -91,26 +91,51 @@ use pin_project_lite::pin_project;
 /// ```
 
 #[derive(Debug)]
-struct CondVar {
+/// a custom implementation of a CondVar that short-circuits after
+/// being signaled once
+struct ShortCircuitingCondVar {
     event: Event,
     signaled: AtomicBool,
 }
 
+impl ShortCircuitingCondVar {
+    fn notify(&self, n: usize) {
+        // TODO: This can probably be `Relaxed` and `notify_relaxed`
+        self.signaled.store(true, Ordering::SeqCst);
+        self.event.notify(n);
+    }
+
+    fn listen(&self) -> Option<EventListener> {
+        // We probably need to register this event listener before checking the flag
+        // to prevent race conditions
+        let listener = self.event.listen();
+
+        // TODO: This can probably also be `Relaxed`
+        if self.signaled.load(Ordering::SeqCst) {
+            // This happens implicitely as `listener` goes out of scope:
+
+            None // The `CondVar` has already been triggered so we don't need to wait
+        } else {
+            Some(listener)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct StopSource {
-    signal: Arc<CondVar>,
+    signal: Arc<ShortCircuitingCondVar>,
     stop_token: StopToken,
 }
 
 /// `StopToken` is a future which completes when the associated `StopSource` is dropped.
 #[derive(Debug, Clone)]
 pub struct StopToken {
-    signal: Arc<CondVar>,
+    signal: Arc<ShortCircuitingCondVar>,
 }
 
 impl Default for StopSource {
     fn default() -> StopSource {
-        let signal = Arc::new(CondVar {
+        let signal = Arc::new(ShortCircuitingCondVar {
             event: Event::new(),
             signaled: AtomicBool::new(false),
         });
@@ -123,9 +148,8 @@ impl Default for StopSource {
 
 impl Drop for StopSource {
     fn drop(&mut self) {
-        // This can probably be `Relaxed` and notify_relaxed
-        self.signal.signaled.store(true, Ordering::SeqCst);
-        self.signal.event.notify(usize::MAX);
+        // TODO: notifying only one StopToken should be sufficient
+        self.signal.notify(usize::MAX);
     }
 }
 
@@ -147,19 +171,13 @@ impl Future for StopToken {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        // We probably need to register this event listener before checking the flag
-        // to prevent race conditions
-        let mut event = self.signal.event.listen();
-
-        // This can also probably be `Relaxed`
-        if self.signal.signaled.load(Ordering::SeqCst) {
-            return Poll::Ready(());
-        }
-
-        let event = Pin::new(&mut event);
-        match Future::poll(event, cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(_) => Poll::Ready(()),
+        if let Some(mut listener) = self.signal.listen() {
+            match Future::poll(Pin::new(&mut listener), cx) {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(_) => Poll::Ready(()),
+            }
+        } else {
+            Poll::Ready(())
         }
     }
 }
