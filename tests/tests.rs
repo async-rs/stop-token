@@ -103,59 +103,46 @@ fn contest_cached_listener() {
     task::block_on(async {
         let stop_source = StopSource::new();
 
-        let (sender_a, receiver_a) = channel::<i32>(10);
-        let recv_task_a = task::spawn({
-            let stop_token = stop_source.stop_token();
-            let receiver = receiver_a.clone();
-            async move {
-                let mut xs = Vec::new();
-                let mut stream = stop_token.stop_stream(receiver);
-                while let Some(x) = stream.next().await {
-                    xs.push(x)
-                }
-                xs
-            }
-        });
+        const N: usize = 8;
 
-        let (sender_b, receiver_b) = channel::<i32>(10);
-        let recv_task_b = task::spawn({
-            let stop_token = stop_source.stop_token();
-            let receiver = receiver_b.clone();
-            async move {
-                let mut xs = Vec::new();
-                let mut stream = stop_token.stop_stream(receiver);
-                while let Some(x) = stream.next().await {
-                    xs.push(x)
-                }
-                xs
-            }
-        });
+        let mut recv_tasks = Vec::with_capacity(N);
+        let mut send_tasks = Vec::with_capacity(N);
 
-        let _send_task_a = task::spawn({
-            let sender = sender_a.clone();
-            async move {
-                for i in 0.. {
-                    sender.send(i).await;
+        for _ in 0..N {
+            let (sender, receiver) = channel::<i32>(10);
+            let recv_task = task::spawn({
+                let stop_token = stop_source.stop_token();
+                let receiver = receiver.clone();
+                async move {
+                    let mut messages = Vec::new();
+                    let mut stream = stop_token.stop_stream(receiver);
+                    while let Some(msg) = stream.next().await {
+                        messages.push(msg)
+                    }
+                    messages
                 }
-            }
-        });
+            });
 
-        let _send_task_b = task::spawn({
-            let sender = sender_b.clone();
-            async move {
-                for i in 0.. {
-                    sender.send(i).await;
+            let send_task = task::spawn({
+                async move {
+                    for msg in 0.. {
+                        sender.send(msg).await;
+                    }
                 }
-            }
-        });
+            });
 
-        task::sleep(Duration::from_millis(250)).await;
+            recv_tasks.push(recv_task);
+            send_tasks.push(send_task);
+        }
+
+        task::sleep(Duration::from_millis(500)).await;
 
         drop(stop_source);
 
-        task::sleep(Duration::from_millis(250)).await;
+        task::sleep(Duration::from_millis(500)).await;
 
-        assert!(!recv_task_a.await.is_empty());
-        assert!(!recv_task_b.await.is_empty())
+        for (i, recv_task) in recv_tasks.into_iter().enumerate() {
+            eprintln!("receiver {} got {} messages", i, recv_task.await.len());
+        }
     })
 }
