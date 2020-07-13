@@ -106,18 +106,21 @@ impl ShortCircuitingCondVar {
     }
 
     fn listen(&self) -> Option<EventListener> {
-        // We probably need to register this event listener before checking the flag
-        // to prevent race conditions
+        // TODO: These could maybe be `Aquire`
+        // Check if the `CondVar` has already been triggered
+        if self.signaled.load(Ordering::SeqCst) {
+            return None; // The `CondVar` has already been triggered so we don't need to wait
+        }
+
+        // Register a new listener
         let listener = self.event.listen();
 
-        // TODO: This can probably also be `Relaxed`
+        // Make sure the `CondVar` still has not been triggered to prevent race conditions
         if self.signaled.load(Ordering::SeqCst) {
-            // This happens implicitely as `listener` goes out of scope:
-
-            None // The `CondVar` has already been triggered so we don't need to wait
-        } else {
-            Some(listener)
+            return None;
         }
+
+        Some(listener)
     }
 }
 
