@@ -137,26 +137,24 @@ impl ShortCircuitingCondVar {
     }
 
     fn cache_listener(&self, listener: EventListener) -> Result<(), EventListener> {
-        // Check if there is already a cached listener
+        // Check if there is already a cached listener to prevent `Box` if it's not neccessary
         if self.cached_listener.load(Ordering::SeqCst).is_null() {
             let listener = Box::new(listener);
 
-            unsafe {
-                let res = self.cached_listener.compare_and_swap(
-                    null_mut(),
-                    Box::into_raw(listener),
-                    Ordering::SeqCst,
-                );
-                if res.is_null() {
-                    Ok(())
-                } else {
-                    // We failed to write our new cached listener due to a race
-                    // Turn it back into a Box and return it to the caller
+            let res = self.cached_listener.compare_and_swap(
+                null_mut(),
+                Box::into_raw(listener),
+                Ordering::SeqCst,
+            );
+            if res.is_null() {
+                Ok(())
+            } else {
+                // We failed to write our new cached listener due to a race
+                // Turn it back into a Box and return it to the caller
 
-                    // Safety: the `cached_listener` is not null and can only come from a Box::into_raw
-                    // it is also replaced with a `null` pointer when read so there can not be another owner.
-                    Err(*Box::from_raw(res))
-                }
+                // Safety: the `cached_listener` is not null and can only come from a Box::into_raw
+                // it is also replaced with a `null` pointer when read so there can not be another owner.
+                Err(*unsafe { Box::from_raw(res) })
             }
         } else {
             Err(listener)
