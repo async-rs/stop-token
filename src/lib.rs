@@ -93,6 +93,7 @@ use std::task::{Context, Poll};
 
 struct AtomicOption<T>(AtomicPtr<T>);
 
+// TODO: relax orderings on atomic accesses
 impl<T> AtomicOption<T> {
     fn is_none(&self) -> bool {
         self.0.load(Ordering::SeqCst).is_null()
