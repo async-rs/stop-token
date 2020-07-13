@@ -172,9 +172,7 @@ pub struct StopSource {
 
 /// `StopToken` is a future which completes when the associated `StopSource` is dropped.
 #[derive(Debug, Clone)]
-pub struct StopToken {
-    signal: Arc<ShortCircuitingCondVar>,
-}
+pub struct StopToken(Arc<ShortCircuitingCondVar>);
 
 impl Default for StopSource {
     fn default() -> StopSource {
@@ -185,7 +183,7 @@ impl Default for StopSource {
         });
         StopSource {
             signal: signal.clone(),
-            stop_token: StopToken { signal },
+            stop_token: StopToken(signal),
         }
     }
 }
@@ -215,7 +213,7 @@ impl Future for StopToken {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        if let Some(mut listener) = self.signal.listen() {
+        if let Some(mut listener) = self.0.listen() {
             let result = match Future::poll(Pin::new(&mut listener), cx) {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(_) => Poll::Ready(()),
@@ -223,7 +221,7 @@ impl Future for StopToken {
 
             // Try to cache the listener, if there already is a cached listener
             // drop the one we have
-            let _ = self.signal.cache_listener(listener);
+            let _ = self.0.cache_listener(listener);
 
             return result;
         } else {
