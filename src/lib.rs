@@ -193,7 +193,13 @@ impl ShortCircuitingCondVar {
     }
 
     fn listen(&self) -> Option<EventListener> {
-        // safety:
+        // Safety:
+        // The `Event` (`self.0`) is only written when it's dropped and since
+        // it oviously still exists we can have an immutable reference to it.
+        // Our reference is also only used during our function scope
+        // during which we have borrowed `self`.
+        // This means that the reference returned by `as_ref` adheres to rust borrowing
+        // rust which makes this operation safe.
         unsafe { self.0.as_ref() }.map(|event| event.listen())
     }
 }
