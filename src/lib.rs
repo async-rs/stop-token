@@ -91,7 +91,8 @@ use std::task::{Context, Poll};
 /// drop(stop_source); // At this point, scheduled work notices that it is canceled.
 /// ```
 
-struct AtomicOption<T>(AtomicPtr<T>);
+/// An immutable, atomic option type that store data in Boxed Arcs
+struct AtomicOption<T>(AtomicPtr<Arc<T>>);
 
 // TODO: relax orderings on atomic accesses
 impl<T> AtomicOption<T> {
@@ -104,23 +105,26 @@ impl<T> AtomicOption<T> {
         !self.is_none()
     }
 
-    /// Safety: the caller needs to make sure no one is writing to this value
-    ///         and that no one will do so until the returned refence it dropped
-    #[allow(unused_unsafe)]
-    unsafe fn as_ref<'s>(&'s self) -> Option<&'s T> {
+    fn get(&self) -> Option<Arc<T>> {
         let ptr = self.0.load(Ordering::SeqCst);
         if ptr.is_null() {
             None
         } else {
-            // Safety: we know that ptr is a valid ptr to a `T`
-            //         since it is not null and it can only be written in `new` or `replace`
-            Some(unsafe { std::mem::transmute(ptr) })
+            // Safety: we know that `ptr` is not null and can only have been created from a `Box` by `new` or `replace`
+            // this means it's safe to turn back into a `Box`
+            let arc_box = unsafe { Box::from_raw(ptr as *mut Arc<T>) };
+
+            let arc = *arc_box.clone(); // Clone the Arc
+
+            Box::leak(arc_box); // And make sure rust doesn't drop our inner value
+
+            Some(arc)
         }
     }
 
     fn new(value: Option<T>) -> Self {
         let ptr = if let Some(value) = value {
-            Box::into_raw(Box::new(value))
+            Box::into_raw(Box::new(Arc::new(value)))
         } else {
             null_mut()
         };
@@ -128,22 +132,13 @@ impl<T> AtomicOption<T> {
         Self(AtomicPtr::new(ptr))
     }
 
-    fn take(&self) -> Option<T> {
-        let ptr = self.0.swap(null_mut(), Ordering::SeqCst);
-
-        if ptr.is_null() {
-            None
-        } else {
-            // Safety: we know that `ptr` is not null and can only have been created from a `Box` by `new` or `replace`
-            // means it's safe to turn back into a `Box`
-            Some(*unsafe { Box::from_raw(ptr) })
-        }
+    fn take(&self) -> Option<Arc<T>> {
+        self.replace(None)
     }
 
-    #[allow(dead_code)]
-    fn replace(&self, new: Option<T>) -> Option<T> {
+    fn replace(&self, new: Option<T>) -> Option<Arc<T>> {
         let new_ptr = if let Some(new) = new {
-            Box::into_raw(Box::new(new))
+            Box::into_raw(Box::new(Arc::new(new)))
         } else {
             null_mut()
         };
@@ -154,8 +149,8 @@ impl<T> AtomicOption<T> {
             None
         } else {
             // Safety: we know that `ptr` is not null and can only have been created from a `Box` by `new` or `replace`
-            // means it's safe to turn back into a `Box`
-            Some(*unsafe { Box::from_raw(ptr) })
+            // this means it's safe to turn back into a `Box`
+            Some(unsafe { *Box::from_raw(ptr) })
         }
     }
 }
@@ -194,14 +189,7 @@ impl ShortCircuitingCondVar {
     }
 
     fn listen(&self) -> Option<EventListener> {
-        // Safety:
-        // The `Event` (`self.0`) is only written when it's dropped and since
-        // it oviously still exists we can have an immutable reference to it.
-        // Our reference is also only used during our function scope
-        // during which we have borrowed `self`.
-        // This means that the reference returned by `as_ref` adheres to rust borrowing
-        // rust which makes this operation safe.
-        unsafe { self.0.as_ref() }.map(|event| event.listen())
+        self.0.get().map(|event| event.listen())
     }
 }
 
