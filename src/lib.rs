@@ -74,11 +74,11 @@ use std::sync::{
     atomic::{AtomicPtr, Ordering},
     Arc,
 };
-use std::task::{Context, Poll};
 
 use event_listener::{Event, EventListener};
 use futures::stream::Stream;
 use pin_project_lite::pin_project;
+use std::task::{Context, Poll};
 
 /// `StopSource` produces `StopToken` and cancels all of its tokens on drop.
 ///
@@ -91,96 +91,110 @@ use pin_project_lite::pin_project;
 /// drop(stop_source); // At this point, scheduled work notices that it is canceled.
 /// ```
 
-#[derive(Debug)]
-/// a custom implementation of a CondVar that short-circuits after
-/// being signaled once
-struct ShortCircuitingCondVar {
-    // TODO: is there a better (safer) way to have an atomic `Option`?
-    cached_listener: AtomicPtr<EventListener>, // This is a raw pointer to a Box
-    event: AtomicPtr<Event>,
-}
+struct AtomicOption<T>(AtomicPtr<T>);
 
-impl Drop for ShortCircuitingCondVar {
-    fn drop(&mut self) {
-        // make sure we don't leak any listeners or the event
-        {
-            self.take_cached_listener();
-        }
-        self.notify(usize::MAX);
+impl<T> AtomicOption<T> {
+    fn is_none(&self) -> bool {
+        self.0.load(Ordering::SeqCst).is_null()
     }
-}
 
-impl ShortCircuitingCondVar {
-    fn notify(&self, n: usize) {
-        // TODO: This can probably be `Relaxed` and `notify_relaxed`
-        let event = self.event.swap(null_mut(), Ordering::SeqCst);
-        if !event.is_null() {
-            // Safety: event can only either be a valid raw Box pointer of null
-            let event = *unsafe { Box::from_raw(event) };
-            event.notify(n);
+    #[allow(dead_code)]
+    fn is_some(&self) -> bool {
+        !self.is_none()
+    }
+
+    /// Safety: the caller needs to make sure no one is writing to this value
+    ///         and that no one will do so until the returned refence it dropped
+    #[allow(unused_unsafe)]
+    unsafe fn as_ref<'s>(&'s self) -> Option<&'s T> {
+        let ptr = self.0.load(Ordering::SeqCst);
+        if ptr.is_null() {
+            None
+        } else {
+            // Safety: we know that ptr is a valid ptr to a `T`
+            //         since it is not null and it can only be written in `new` or `replace`
+            Some(unsafe { std::mem::transmute(ptr) })
         }
     }
 
-    fn take_cached_listener(&self) -> Option<EventListener> {
-        let ptr = self.cached_listener.swap(null_mut(), Ordering::SeqCst);
+    fn new(value: Option<T>) -> Self {
+        let ptr = if let Some(value) = value {
+            Box::into_raw(Box::new(value))
+        } else {
+            null_mut()
+        };
+
+        Self(AtomicPtr::new(ptr))
+    }
+
+    fn take(&self) -> Option<T> {
+        let ptr = self.0.swap(null_mut(), Ordering::SeqCst);
 
         if ptr.is_null() {
             None
         } else {
-            // Safety: the `cached_listener` is not null and can only come from a Box::into_raw
-            // it is also replaced with a `null` pointer when read so there can not be another owner.
-            Some(unsafe { *Box::from_raw(ptr) })
+            // Safety: we know that `ptr` is not null and can only have been created from a `Box` by `new` or `replace`
+            // means it's safe to turn back into a `Box`
+            Some(*unsafe { Box::from_raw(ptr) })
         }
+    }
+
+    #[allow(dead_code)]
+    fn replace(&self, new: Option<T>) -> Option<T> {
+        let new_ptr = if let Some(new) = new {
+            Box::into_raw(Box::new(new))
+        } else {
+            null_mut()
+        };
+
+        let ptr = self.0.swap(new_ptr, Ordering::SeqCst);
+
+        if ptr.is_null() {
+            None
+        } else {
+            // Safety: we know that `ptr` is not null and can only have been created from a `Box` by `new` or `replace`
+            // means it's safe to turn back into a `Box`
+            Some(*unsafe { Box::from_raw(ptr) })
+        }
+    }
+}
+
+impl<T> Drop for AtomicOption<T> {
+    fn drop(&mut self) {
+        std::mem::drop(self.take());
+    }
+}
+
+impl<T> std::fmt::Debug for AtomicOption<T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_none() {
+            write!(f, "None")
+        } else {
+            write!(f, "Some(<Opaque>)")
+        }
+    }
+}
+
+/// a custom implementation of a CondVar that short-circuits after
+/// being signaled once
+#[derive(Debug)]
+struct ShortCircuitingCondVar(AtomicOption<Event>);
+
+impl ShortCircuitingCondVar {
+    fn is_done(&self) -> bool {
+        self.0.is_none()
+    }
+
+    fn notify(&self, n: usize) -> bool {
+        self.0.take().map(|x| x.notify(n)).is_some()
     }
 
     fn listen(&self) -> Option<EventListener> {
-        // TODO: These could maybe be `Aquire`
-        // Check if the `CondVar` has already been triggered
-        if self.event.load(Ordering::SeqCst).is_null() {
-            return None; // The `CondVar` has already been triggered so we don't need to wait
-        }
-
-        let listener = self.take_cached_listener().or_else(|| {
-            let event = self.event.load(Ordering::SeqCst);
-
-            if event.is_null() {
-                return None;
-            }
-
-            // Safety: `event` is not null and is not used mutably by anyone until it is dropped
-            let event: &Event = unsafe { std::mem::transmute(event) };
-
-            let listener = event.listen();
-
-            Some(listener)
-        });
-
-        listener
-    }
-
-    fn cache_listener(&self, listener: EventListener) -> Result<(), EventListener> {
-        // Check if there is already a cached listener to prevent `Box` if it's not neccessary
-        if self.cached_listener.load(Ordering::SeqCst).is_null() {
-            let listener = Box::new(listener);
-
-            let res = self.cached_listener.compare_and_swap(
-                null_mut(),
-                Box::into_raw(listener),
-                Ordering::SeqCst,
-            );
-            if res.is_null() {
-                Ok(())
-            } else {
-                // We failed to write our new cached listener due to a race
-                // Turn it back into a Box and return it to the caller
-
-                // Safety: the `cached_listener` is not null and can only come from a Box::into_raw
-                // it is also replaced with a `null` pointer when read so there can not be another owner.
-                Err(*unsafe { Box::from_raw(res) })
-            }
-        } else {
-            Err(listener)
-        }
+        // safety:
+        unsafe { self.0.as_ref() }.map(|event| event.listen())
     }
 }
 
@@ -190,24 +204,50 @@ pub struct StopSource {
 }
 
 /// `StopToken` is a future which completes when the associated `StopSource` is dropped.
-#[derive(Debug, Clone)]
-pub struct StopToken(Arc<ShortCircuitingCondVar>);
+#[derive(Debug)]
+pub struct StopToken {
+    cond_var: Arc<ShortCircuitingCondVar>,
+    cached_listener: Option<EventListener>,
+}
+
+impl StopToken {
+    fn new(cond_var: Arc<ShortCircuitingCondVar>) -> Self {
+        Self {
+            cond_var,
+            cached_listener: None,
+        }
+    }
+
+    fn listen(&mut self) -> Option<&mut EventListener> {
+        if self.cond_var.is_done() {
+            return None;
+        }
+
+        if self.cached_listener.is_none() {
+            self.cached_listener = self.cond_var.listen();
+        }
+        self.cached_listener.as_mut()
+    }
+}
+
+impl Clone for StopToken {
+    fn clone(&self) -> Self {
+        Self::new(self.cond_var.clone())
+    }
+}
 
 impl Default for StopSource {
     fn default() -> StopSource {
-        let signal = Arc::new(ShortCircuitingCondVar {
-            cached_listener: AtomicPtr::new(null_mut()),
-            event: AtomicPtr::new(Box::into_raw(Box::new(Event::new()))),
-        });
         StopSource {
-            signal: signal.clone(),
+            signal: Arc::new(ShortCircuitingCondVar(AtomicOption::new(
+                Some(Event::new()),
+            ))),
         }
     }
 }
 
 impl Drop for StopSource {
     fn drop(&mut self) {
-        // TODO: notifying only one StopToken should be sufficient
         self.signal.notify(usize::MAX);
     }
 }
@@ -222,23 +262,19 @@ impl StopSource {
     ///
     /// Once the source is destroyed, `StopToken` future completes.
     pub fn stop_token(&self) -> StopToken {
-        StopToken(self.signal.clone())
+        StopToken::new(self.signal.clone())
     }
 }
 
 impl Future for StopToken {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        if let Some(mut listener) = self.0.listen() {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        if let Some(mut listener) = self.listen() {
             let result = match Future::poll(Pin::new(&mut listener), cx) {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(_) => Poll::Ready(()),
             };
-
-            // Try to cache the listener, if there already is a cached listener
-            // drop the one we have
-            let _ = self.0.cache_listener(listener);
 
             return result;
         } else {
