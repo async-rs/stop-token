@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use async_std::{prelude::*, task, sync::channel};
+use async_std::{prelude::*, sync::channel, task};
 
 use stop_token::StopSource;
 
@@ -13,13 +13,14 @@ fn smoke() {
             let stop_token = stop_source.stop_token();
             let receiver = receiver.clone();
             async move {
-            let mut xs = Vec::new();
-            let mut stream = stop_token.stop_stream(receiver);
-            while let Some(x) = stream.next().await {
-                xs.push(x)
+                let mut xs = Vec::new();
+                let mut stream = stop_token.stop_stream(receiver);
+                while let Some(x) = stream.next().await {
+                    xs.push(x)
+                }
+                xs
             }
-            xs
-        }});
+        });
         sender.send(1).await;
         sender.send(2).await;
         sender.send(3).await;
