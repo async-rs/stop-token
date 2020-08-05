@@ -230,3 +230,17 @@ pub trait WithStopTokenExt: Future {
         }
     }
 }
+
+impl<S> WithStopTokenStreamExt for S where S: Stream {}
+
+pub trait WithStopTokenStreamExt: Stream {
+    fn with_stop_token(self, stop_token: &StopToken) -> StopStream<Self>
+    where
+        Self: Sized,
+    {
+        StopStream {
+            stop_token: stop_token.clone(),
+            stream: self,
+        }
+    }
+}
