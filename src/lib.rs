@@ -76,6 +76,19 @@ use pin_project_lite::pin_project;
 
 enum Never {}
 
+#[derive(Debug)]
+pub enum Error {
+    Stopped,
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for Error {}
+
 /// `StopSource` produces `StopToken` and cancels all of its tokens on drop.
 ///
 /// # Example:
@@ -190,16 +203,30 @@ pin_project! {
 }
 
 impl<F: Future> Future for StopFuture<F> {
-    type Output = Option<F::Output>;
+    type Output = Result<F::Output, Error>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<F::Output>> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<F::Output, Error>> {
         let this = self.project();
         if let Poll::Ready(()) = this.stop_token.poll(cx) {
-            return Poll::Ready(None);
+            return Poll::Ready(Err(Error::Stopped));
         }
         match this.future.poll(cx) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(it) => Poll::Ready(Some(it)),
+            Poll::Ready(it) => Poll::Ready(Ok(it)),
+        }
+    }
+}
+
+impl<F> WithStopTokenExt for F where F: Future {}
+
+pub trait WithStopTokenExt: Future {
+    fn with_stop_token(self, stop_token: &StopToken) -> StopFuture<Self>
+    where
+        Self: Sized,
+    {
+        StopFuture {
+            stop_token: stop_token.clone(),
+            future: self,
         }
     }
 }
