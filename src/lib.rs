@@ -71,7 +71,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use async_std::prelude::*;
-use async_std::sync::{channel, Receiver, Sender};
+
+use async_std::channel::{self, Receiver, Sender};
 use pin_project_lite::pin_project;
 
 enum Never {}
@@ -101,7 +102,7 @@ pub struct StopToken {
 
 impl Default for StopSource {
     fn default() -> StopSource {
-        let (sender, receiver) = channel::<Never>(1);
+        let (sender, receiver) = channel::bounded::<Never>(1);
 
         StopSource {
             _chan: sender,
