@@ -9,5 +9,5 @@ repository = "https://github.com/async-rs/stop-token"
 description = "Experimental cooperative cancellation for async-std"
 
 [dependencies]
-pin-project-lite = "0.1.0"
+pin-project-lite = "0.2.0"
 async-std = "1.8"
