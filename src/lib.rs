@@ -5,15 +5,6 @@
 //! Experimental. The library works as is, breaking changes will bump major
 //! version, but there are no guarantees of long-term support.
 //!
-//! Additionally, this library uses unstable cargo feature feature of `async-std` and, for
-//! this reason, should be used like this:
-//!
-//! ```toml
-//! [dependencies.stop-token]
-//! version = "0.1.0"
-//! features = [ "unstable" ]
-//! ```
-//!
 //! # Motivation
 //!
 //! Rust futures come with a build-in cancellation mechanism: dropping a future
@@ -71,7 +62,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use async_std::prelude::*;
-use async_std::sync::{channel, Receiver, Sender};
+use async_std::channel::{self, Receiver, Sender};
 use pin_project_lite::pin_project;
 
 enum Never {}
@@ -101,7 +92,7 @@ pub struct StopToken {
 
 impl Default for StopSource {
     fn default() -> StopSource {
-        let (sender, receiver) = channel::<Never>(1);
+        let (sender, receiver) = channel::bounded::<Never>(1);
 
         StopSource {
             _chan: sender,
