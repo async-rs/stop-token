@@ -1,6 +1,6 @@
 //! Extension methods and types for the `Future` trait.
 
-use crate::StopToken;
+use crate::IntoDeadline;
 use core::future::Future;
 use core::pin::Pin;
 
@@ -10,12 +10,13 @@ use std::task::{Context, Poll};
 pub trait FutureExt: Future {
     /// Applies the token to the `future`, such that the resulting future
     /// completes with `None` if the token is cancelled.
-    fn until(self, deadline: StopToken) -> StopFuture<Self>
+    fn until<T, D>(self, target: T) -> StopFuture<Self, D>
     where
         Self: Sized,
+        T: IntoDeadline<Deadline = D>,
     {
         StopFuture {
-            deadline,
+            deadline: target.into_deadline(),
             future: self,
         }
     }
@@ -23,15 +24,19 @@ pub trait FutureExt: Future {
 
 pin_project! {
     #[derive(Debug)]
-    pub struct StopFuture<F> {
-        #[pin]
-        deadline: StopToken,
+    pub struct StopFuture<F, D> {
         #[pin]
         future: F,
+        #[pin]
+        deadline: D,
     }
 }
 
-impl<F: Future> Future for StopFuture<F> {
+impl<F, D> Future for StopFuture<F, D>
+where
+    F: Future,
+    D: Future<Output = ()>,
+{
     type Output = Option<F::Output>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<F::Output>> {

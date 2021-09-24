@@ -39,11 +39,12 @@
 //! ```
 //! use async_std::prelude::*;
 //! use stop_token::prelude::*;
+//! use stop_token::StopToken;
 //!
 //! struct Event;
 //!
-//! async fn do_work(work: impl Stream<Item = Event> + Unpin, stop_token: StopToken) {
-//!     let mut work = stop_token.stop_stream(work);
+//! async fn do_work(work: impl Stream<Item = Event> + Unpin, stop: StopToken) {
+//!     let mut work = work.until(stop);
 //!     while let Some(event) = work.next().await {
 //!         process_event(event).await
 //!     }
@@ -61,12 +62,14 @@
 pub mod future;
 pub mod stream;
 
+mod deadline;
 mod stop_source;
 
+pub use deadline::IntoDeadline;
 pub use stop_source::{StopSource, StopToken};
 
 /// A prelude for `stop-token`.
 pub mod prelude {
-    pub use crate::future::FutureExt;
-    pub use crate::stream::StreamExt;
+    pub use crate::future::FutureExt as _;
+    pub use crate::stream::StreamExt as _;
 }

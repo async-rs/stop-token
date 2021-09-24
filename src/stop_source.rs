@@ -4,7 +4,6 @@ use core::task::{Context, Poll};
 
 use async_channel::{bounded, Receiver, Sender};
 use futures_core::stream::Stream;
-use pin_project_lite::pin_project;
 
 enum Never {}
 
@@ -56,6 +55,14 @@ impl StopSource {
     }
 }
 
+impl super::IntoDeadline for StopToken {
+    type Deadline = Self;
+
+    fn into_deadline(self) -> Self::Deadline {
+        self
+    }
+}
+
 impl Future for StopToken {
     type Output = ();
 
@@ -65,73 +72,6 @@ impl Future for StopToken {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(never)) => match never {},
             Poll::Ready(None) => Poll::Ready(()),
-        }
-    }
-}
-
-impl StopToken {
-    /// Applies the token to the `stream`, such that the resulting stream
-    /// produces no more items once the token becomes cancelled.
-    pub fn stop_stream<S: Stream>(&self, stream: S) -> StopStream<S> {
-        StopStream {
-            stop_token: self.clone(),
-            stream,
-        }
-    }
-
-    /// Applies the token to the `future`, such that the resulting future
-    /// completes with `None` if the token is cancelled.
-    pub fn stop_future<F: Future>(&self, future: F) -> StopFuture<F> {
-        StopFuture {
-            stop_token: self.clone(),
-            future,
-        }
-    }
-}
-
-pin_project! {
-    #[derive(Debug)]
-    pub struct StopStream<S> {
-        #[pin]
-        stop_token: StopToken,
-        #[pin]
-        stream: S,
-    }
-}
-
-impl<S: Stream> Stream for StopStream<S> {
-    type Item = S::Item;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.project();
-        if let Poll::Ready(()) = this.stop_token.poll(cx) {
-            return Poll::Ready(None);
-        }
-        this.stream.poll_next(cx)
-    }
-}
-
-pin_project! {
-    #[derive(Debug)]
-    pub struct StopFuture<F> {
-        #[pin]
-        stop_token: StopToken,
-        #[pin]
-        future: F,
-    }
-}
-
-impl<F: Future> Future for StopFuture<F> {
-    type Output = Option<F::Output>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<F::Output>> {
-        let this = self.project();
-        if let Poll::Ready(()) = this.stop_token.poll(cx) {
-            return Poll::Ready(None);
-        }
-        match this.future.poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(it) => Poll::Ready(Some(it)),
         }
     }
 }
