@@ -5,15 +5,6 @@
 //! Experimental. The library works as is, breaking changes will bump major
 //! version, but there are no guarantees of long-term support.
 //!
-//! Additionally, this library uses unstable cargo feature feature of `async-std` and, for
-//! this reason, should be used like this:
-//!
-//! ```toml
-//! [dependencies.stop-token]
-//! version = "0.1.0"
-//! features = [ "unstable" ]
-//! ```
-//!
 //! # Motivation
 //!
 //! Rust futures come with a build-in cancellation mechanism: dropping a future
@@ -47,13 +38,14 @@
 //!
 //! ```
 //! use async_std::prelude::*;
+//! use stop_token::prelude::*;
 //! use stop_token::StopToken;
 //!
 //! struct Event;
 //!
-//! async fn do_work(work: impl Stream<Item = Event> + Unpin, stop_token: StopToken) {
-//!     let mut work = stop_token.stop_stream(work);
-//!     while let Some(event) = work.next().await {
+//! async fn do_work(work: impl Stream<Item = Event> + Unpin, stop: StopToken) {
+//!     let mut work = work.until(stop);
+//!     while let Some(Ok(event)) = work.next().await {
 //!         process_event(event).await
 //!     }
 //! }
@@ -62,145 +54,31 @@
 //! }
 //! ```
 //!
+//! # Features
+//!
+//! The `time` submodule is empty when no features are enabled. To implement [`Deadline`]
+//! for `Instant` and `Duration` you can enable one of the following features:
+//!
+//! - `async-io`: for use with the `async-std` or `smol` runtimes.
+//! - `tokio`: for use with the `tokio` runtime.
+//!
 //! # Lineage
 //!
 //! The cancellation system is a subset of `C#` [`CancellationToken / CancellationTokenSource`](https://docs.microsoft.com/en-us/dotnet/standard/threading/cancellation-in-managed-threads).
-//! The `StopToken / StopTokenSource` terminology is borrowed from C++ paper P0660: https://wg21.link/p0660.
+//! The `StopToken / StopTokenSource` terminology is borrowed from [C++ paper P0660](https://wg21.link/p0660).
 
-use std::pin::Pin;
-use std::task::{Context, Poll};
+pub mod future;
+pub mod stream;
+pub mod time;
 
-use async_std::prelude::*;
+mod deadline;
+mod stop_source;
 
-use async_std::channel::{self, Receiver, Sender};
-use pin_project_lite::pin_project;
+pub use deadline::{IntoDeadline, TimedOutError};
+pub use stop_source::{StopSource, StopToken};
 
-enum Never {}
-
-/// `StopSource` produces `StopToken` and cancels all of its tokens on drop.
-///
-/// # Example:
-///
-/// ```ignore
-/// let stop_source = StopSource::new();
-/// let stop_token = stop_source.stop_token();
-/// schedule_some_work(stop_token);
-/// drop(stop_source); // At this point, scheduled work notices that it is canceled.
-/// ```
-#[derive(Debug)]
-pub struct StopSource {
-    /// Solely for `Drop`.
-    _chan: Sender<Never>,
-    stop_token: StopToken,
-}
-
-/// `StopToken` is a future which completes when the associated `StopSource` is dropped.
-#[derive(Debug, Clone)]
-pub struct StopToken {
-    chan: Receiver<Never>,
-}
-
-impl Default for StopSource {
-    fn default() -> StopSource {
-        let (sender, receiver) = channel::bounded::<Never>(1);
-
-        StopSource {
-            _chan: sender,
-            stop_token: StopToken { chan: receiver },
-        }
-    }
-}
-
-impl StopSource {
-    /// Creates a new `StopSource`.
-    pub fn new() -> StopSource {
-        StopSource::default()
-    }
-
-    /// Produces a new `StopToken`, associated with this source.
-    ///
-    /// Once the source is destroyed, `StopToken` future completes.
-    pub fn stop_token(&self) -> StopToken {
-        self.stop_token.clone()
-    }
-}
-
-impl Future for StopToken {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        let chan = Pin::new(&mut self.chan);
-        match Stream::poll_next(chan, cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(never)) => match never {},
-            Poll::Ready(None) => Poll::Ready(()),
-        }
-    }
-}
-
-impl StopToken {
-    /// Applies the token to the `stream`, such that the resulting stream
-    /// produces no more items once the token becomes cancelled.
-    pub fn stop_stream<S: Stream>(&self, stream: S) -> StopStream<S> {
-        StopStream {
-            stop_token: self.clone(),
-            stream,
-        }
-    }
-
-    /// Applies the token to the `future`, such that the resulting future
-    /// completes with `None` if the token is cancelled.
-    pub fn stop_future<F: Future>(&self, future: F) -> StopFuture<F> {
-        StopFuture {
-            stop_token: self.clone(),
-            future,
-        }
-    }
-}
-
-pin_project! {
-    #[derive(Debug)]
-    pub struct StopStream<S> {
-        #[pin]
-        stop_token: StopToken,
-        #[pin]
-        stream: S,
-    }
-}
-
-impl<S: Stream> Stream for StopStream<S> {
-    type Item = S::Item;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.project();
-        if let Poll::Ready(()) = this.stop_token.poll(cx) {
-            return Poll::Ready(None);
-        }
-        this.stream.poll_next(cx)
-    }
-}
-
-pin_project! {
-    #[derive(Debug)]
-    pub struct StopFuture<F> {
-        #[pin]
-        stop_token: StopToken,
-        #[pin]
-        future: F,
-    }
-}
-
-impl<F: Future> Future for StopFuture<F> {
-    type Output = Option<F::Output>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<F::Output>> {
-        let this = self.project();
-        if let Poll::Ready(()) = this.stop_token.poll(cx) {
-            return Poll::Ready(None);
-        }
-        match this.future.poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(it) => Poll::Ready(Some(it)),
-        }
-    }
+/// A prelude for `stop-token`.
+pub mod prelude {
+    pub use crate::future::FutureExt as _;
+    pub use crate::stream::StreamExt as _;
 }
