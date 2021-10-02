@@ -54,6 +54,14 @@
 //! }
 //! ```
 //!
+//! # Features
+//!
+//! The `time` submodule is empty when no features are enabled. To implement [`Deadline`]
+//! for `Instant` and `Duration` you can enable one of the following features:
+//!
+//! - `async-io`: for use with the `async-std` or `smol` runtimes.
+//! - `tokio`: for use with the `tokio` runtime.
+//!
 //! # Lineage
 //!
 //! The cancellation system is a subset of `C#` [`CancellationToken / CancellationTokenSource`](https://docs.microsoft.com/en-us/dotnet/standard/threading/cancellation-in-managed-threads).

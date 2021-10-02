@@ -43,16 +43,6 @@ mod asyncio {
 
     use pin_project_lite::pin_project;
 
-    impl IntoDeadline for std::time::Duration {
-        type Deadline = Deadline;
-
-        fn into_deadline(self) -> Self::Deadline {
-            Deadline {
-                delay: Timer::after(self),
-            }
-        }
-    }
-
     pin_project! {
         /// A future that times out after a duration of time.
         #[must_use = "Futures do nothing unless polled or .awaited"]
@@ -75,12 +65,74 @@ mod asyncio {
         }
     }
 
+    impl IntoDeadline for std::time::Duration {
+        type Deadline = Deadline;
+
+        fn into_deadline(self) -> Self::Deadline {
+            Deadline {
+                delay: Timer::after(self),
+            }
+        }
+    }
+
     impl IntoDeadline for std::time::Instant {
         type Deadline = Deadline;
 
         fn into_deadline(self) -> Self::Deadline {
             Deadline {
                 delay: Timer::at(self),
+            }
+        }
+    }
+}
+
+#[cfg(feature = "tokio")]
+pub use tokiooo::*;
+
+#[cfg(any(feature = "tokio", feature = "docs"))]
+mod tokiooo {
+    use std::future::{pending, Future, Pending};
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+    use tokio::time::{timeout, timeout_at, Instant as TokioInstant, Timeout};
+
+    use crate::IntoDeadline;
+
+    /// A future that times out after a duration of time.
+    #[must_use = "Futures do nothing unless polled or .awaited"]
+    #[derive(Debug)]
+    pub struct Deadline {
+        delay: Pin<Box<Timeout<Pending<()>>>>,
+    }
+
+    impl Future for Deadline {
+        type Output = ();
+
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            match Pin::new(&mut self.delay).poll(cx) {
+                Poll::Ready(_) => Poll::Ready(()),
+                Poll::Pending => Poll::Pending,
+            }
+        }
+    }
+
+    impl IntoDeadline for std::time::Duration {
+        type Deadline = Deadline;
+
+        fn into_deadline(self) -> Self::Deadline {
+            Deadline {
+                delay: Box::pin(timeout(self, pending())),
+            }
+        }
+    }
+
+    impl IntoDeadline for std::time::Instant {
+        type Deadline = Deadline;
+
+        fn into_deadline(self) -> Self::Deadline {
+            let instant = TokioInstant::from(self);
+            Deadline {
+                delay: Box::pin(timeout_at(instant, pending())),
             }
         }
     }

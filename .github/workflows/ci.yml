@@ -25,7 +25,13 @@ jobs:
         toolchain: nightly
         override: true
 
-    - name: tests
+    - name: tests async-io
       uses: actions-rs/cargo@v1
       with:
         command: test --features async-io
+
+    - name: tests tokio
+      uses: actions-rs/cargo@v1
+      with:
+        command: test --features tokio
+
