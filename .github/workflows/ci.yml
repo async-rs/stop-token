@@ -28,4 +28,4 @@ jobs:
     - name: tests
       uses: actions-rs/cargo@v1
       with:
-        command: test
+        command: test --features async-io

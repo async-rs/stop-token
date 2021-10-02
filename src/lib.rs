@@ -61,11 +61,12 @@
 
 pub mod future;
 pub mod stream;
+pub mod time;
 
 mod deadline;
 mod stop_source;
 
-pub use deadline::IntoDeadline;
+pub use deadline::{IntoDeadline, TimedOutError};
 pub use stop_source::{StopSource, StopToken};
 
 /// A prelude for `stop-token`.
