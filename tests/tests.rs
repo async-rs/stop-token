@@ -19,7 +19,7 @@ fn smoke() {
             async move {
                 let mut xs = Vec::new();
                 let mut stream = receiver.until(stop_token);
-                while let Some(x) = stream.next().await {
+                while let Some(Ok(x)) = stream.next().await {
                     xs.push(x)
                 }
                 xs

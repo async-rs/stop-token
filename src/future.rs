@@ -1,6 +1,6 @@
 //! Extension methods and types for the `Future` trait.
 
-use crate::IntoDeadline;
+use crate::{deadline::TimeoutError, IntoDeadline};
 use core::future::Future;
 use core::pin::Pin;
 
@@ -37,16 +37,16 @@ where
     F: Future,
     D: Future<Output = ()>,
 {
-    type Output = Option<F::Output>;
+    type Output = Result<F::Output, TimeoutError>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<F::Output>> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         if let Poll::Ready(()) = this.deadline.poll(cx) {
-            return Poll::Ready(None);
+            return Poll::Ready(Err(TimeoutError::new()));
         }
         match this.future.poll(cx) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(it) => Poll::Ready(Some(it)),
+            Poll::Ready(it) => Poll::Ready(Ok(it)),
         }
     }
 }

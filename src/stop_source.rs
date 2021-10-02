@@ -66,7 +66,7 @@ impl super::IntoDeadline for StopToken {
 impl Future for StopToken {
     type Output = ();
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let chan = Pin::new(&mut self.chan);
         match Stream::poll_next(chan, cx) {
             Poll::Pending => Poll::Pending,

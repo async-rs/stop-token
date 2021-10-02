@@ -45,7 +45,7 @@
 //!
 //! async fn do_work(work: impl Stream<Item = Event> + Unpin, stop: StopToken) {
 //!     let mut work = work.until(stop);
-//!     while let Some(event) = work.next().await {
+//!     while let Some(Ok(event)) = work.next().await {
 //!         process_event(event).await
 //!     }
 //! }

@@ -1,6 +1,6 @@
 //! Extension methods and types for the `Stream` trait.
 
-use crate::IntoDeadline;
+use crate::{deadline::TimeoutError, IntoDeadline};
 use core::future::Future;
 use core::pin::Pin;
 
@@ -40,13 +40,13 @@ where
     S: Stream,
     D: Future<Output = ()>,
 {
-    type Item = S::Item;
+    type Item = Result<S::Item, TimeoutError>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
         if let Poll::Ready(()) = this.deadline.poll(cx) {
-            return Poll::Ready(None);
+            return Poll::Ready(Some(Err(TimeoutError::new())));
         }
-        this.stream.poll_next(cx)
+        this.stream.poll_next(cx).map(|el| el.map(|el| Ok(el)))
     }
 }
