@@ -89,7 +89,7 @@ mod asyncio {
 #[cfg(feature = "tokio")]
 pub use tokiooo::*;
 
-#[cfg(any(feature = "tokio", feature = "docs"))]
+#[cfg(feature = "tokio")]
 mod tokiooo {
     use std::future::{pending, Future, Pending};
     use std::pin::Pin;

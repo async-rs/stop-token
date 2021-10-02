@@ -34,7 +34,7 @@
 //!
 //! # Usage
 //!
-//! You can use `stop_token` for this:
+//! You can use this crate to create a deadline received through a [`StopToken`]:
 //!
 //! ```
 //! use async_std::prelude::*;
@@ -54,9 +54,30 @@
 //! }
 //! ```
 //!
+//! Or `Duration` or `Instant` to create a [`time`]-based deadline:
+//!
+//! ```
+//! use std::time::Instant;
+//! use async_std::prelude::*;
+//! use stop_token::prelude::*;
+//! use stop_token::StopToken;
+//!
+//! struct Event;
+//!
+//! async fn do_work(work: impl Stream<Item = Event> + Unpin, until: Instant) {
+//!     let mut work = work.until(until);
+//!     while let Some(Ok(event)) = work.next().await {
+//!         process_event(event).await
+//!     }
+//! }
+//!
+//! async fn process_event(_event: Event) {
+//! }
+//! ```
+//!
 //! # Features
 //!
-//! The `time` submodule is empty when no features are enabled. To implement [`Deadline`]
+//! The `time` submodule is empty when no features are enabled. To implement [`IntoDeadline`]
 //! for `Instant` and `Duration` you can enable one of the following features:
 //!
 //! - `async-io`: for use with the `async-std` or `smol` runtimes.
