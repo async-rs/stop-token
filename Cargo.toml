@@ -1,10 +1,12 @@
 [package]
 name = "stop-token"
-version = "0.3.1"
-authors = ["Aleksey Kladov <aleksey.kladov@gmail.com>"]
+version = "0.3.2"
+authors = ["Aleksey Kladov <aleksey.kladov@gmail.com>", "Yoshua Wuyts <yoshuawuyts@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/async-rs/stop-token"
+homepage = "https://docs.rs/stop-token"
+documentation = "https://docs.rs/stop-token"
 
 description = "Experimental cooperative cancellation for async-std"
 
