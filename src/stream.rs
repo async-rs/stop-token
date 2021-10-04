@@ -8,6 +8,7 @@ use futures_core::Stream;
 use pin_project_lite::pin_project;
 use std::task::{Context, Poll};
 
+/// Extend the `Stream` trait with the `until` method.
 pub trait StreamExt: Stream {
     /// Applies the token to the `stream`, such that the resulting stream
     /// produces no more items once the token becomes cancelled.

@@ -88,6 +88,10 @@
 //! The cancellation system is a subset of `C#` [`CancellationToken / CancellationTokenSource`](https://docs.microsoft.com/en-us/dotnet/standard/threading/cancellation-in-managed-threads).
 //! The `StopToken / StopTokenSource` terminology is borrowed from [C++ paper P0660](https://wg21.link/p0660).
 
+#![forbid(unsafe_code)]
+#![deny(missing_debug_implementations, nonstandard_style, rust_2018_idioms)]
+#![warn(missing_docs, future_incompatible, unreachable_pub)]
+
 pub mod future;
 pub mod stream;
 pub mod time;
