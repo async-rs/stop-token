@@ -47,39 +47,56 @@ You can use this crate to create a deadline received through a `StopToken`:
 
 ```rust
 use async_std::prelude::*;
+use async_std::{stream, task};
+
 use stop_token::prelude::*;
-use stop_token::StopToken;
+use stop_token::StopSource;
 
-struct Event;
+use std::time::Duration;
 
-async fn do_work(work: impl Stream<Item = Event> + Unpin, stop: StopToken) {
-    let mut work = work.until(stop);
-    while let Some(Ok(event)) = work.next().await {
-        process_event(event).await
+#[async_std::main]
+async fn main() {
+    // Create a stop source and generate a token.
+    let src = StopSource::new();
+    let stop = src.token();
+
+    // When stop source is dropped, the loop will stop.
+    // Move the source to a task, and drop it after 100 millis.
+    task::spawn(async move {
+        task::sleep(Duration::from_millis(100)).await;
+        drop(src);
+    });
+
+    // Create a stream that generates numbers until
+    // it receives a signal it needs to stop.
+    let mut work = stream::repeat(12u8).until(stop);
+
+    // Loop over each item in the stream.
+    while let Some(Ok(ev)) = work.next().await {
+        println!("{}", ev);
     }
-}
-
-async fn process_event(_event: Event) {
 }
 ```
 
 Or `Duration` or `Instant` to create a `time`-based deadline:
 
 ```rust
-use std::time::Instant;
 use async_std::prelude::*;
+use async_std::stream;
+
 use stop_token::prelude::*;
-use stop_token::StopToken;
 
-struct Event;
+use std::time::Duration;
 
-async fn do_work(work: impl Stream<Item = Event> + Unpin, until: Instant) {
-    let mut work = work.until(until);
-    while let Some(Ok(event)) = work.next().await {
-        process_event(event).await
+#[async_std::main]
+async fn main() {
+    // Create a stream that generates numbers for 100 millis.
+    let stop = Duration::from_millis(100);
+    let mut work = stream::repeat(12u8).until(stop);
+
+    // Loop over each item in the stream.
+    while let Some(Ok(ev)) = work.next().await {
+        println!("{}", ev);
     }
-}
-
-async fn process_event(_event: Event) {
 }
 ```

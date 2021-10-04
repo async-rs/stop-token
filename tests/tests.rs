@@ -12,13 +12,13 @@ use stop_token::StopSource;
 fn smoke() {
     task::block_on(async {
         let (sender, receiver) = bounded::<i32>(10);
-        let stop_source = StopSource::new();
+        let source = StopSource::new();
         let task = task::spawn({
-            let stop_token = stop_source.stop_token();
+            let token = source.token();
             let receiver = receiver.clone();
             async move {
                 let mut xs = Vec::new();
-                let mut stream = receiver.until(stop_token);
+                let mut stream = receiver.until(token);
                 while let Some(Ok(x)) = stream.next().await {
                     xs.push(x)
                 }
@@ -30,7 +30,7 @@ fn smoke() {
         sender.send(3).await.unwrap();
 
         task::sleep(Duration::from_millis(250)).await;
-        drop(stop_source);
+        drop(source);
         task::sleep(Duration::from_millis(250)).await;
 
         sender.send(4).await.unwrap();

@@ -12,10 +12,10 @@ enum Never {}
 /// # Example:
 ///
 /// ```ignore
-/// let stop_source = StopSource::new();
-/// let stop_token = stop_source.stop_token();
-/// schedule_some_work(stop_token);
-/// drop(stop_source); // At this point, scheduled work notices that it is canceled.
+/// let source = StopSource::new();
+/// let token = source.token();
+/// schedule_some_work(token);
+/// drop(source); // At this point, scheduled work notices that it is canceled.
 /// ```
 #[derive(Debug)]
 pub struct StopSource {
@@ -50,7 +50,7 @@ impl StopSource {
     /// Produces a new `StopToken`, associated with this source.
     ///
     /// Once the source is destroyed, `StopToken` future completes.
-    pub fn stop_token(&self) -> StopToken {
+    pub fn token(&self) -> StopToken {
         self.stop_token.clone()
     }
 }
