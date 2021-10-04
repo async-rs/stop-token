@@ -1,9 +1,47 @@
-# Cooperative cancellation for [async-std](https://async.rs/).
+<h1 align="center">stop-token</h1>
+<div align="center">
+  <strong>
+    Cooperative cancellation for async Rust
+  </strong>
+</div>
 
-Status: experimental.
+<br />
+
+<div align="center">
+  <!-- Crates version -->
+  <a href="https://crates.io/crates/stop-token">
+    <img src="https://img.shields.io/crates/v/stop-token.svg?style=flat-square"
+    alt="Crates.io version" />
+  </a>
+  <!-- Downloads -->
+  <a href="https://crates.io/crates/stop-token">
+    <img src="https://img.shields.io/crates/d/stop-token.svg?style=flat-square"
+      alt="Download" />
+  </a>
+  <!-- docs.rs docs -->
+  <a href="https://docs.rs/stop-token">
+    <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
+      alt="docs.rs docs" />
+  </a>
+</div>
+
+<div align="center">
+  <h3>
+    <a href="https://docs.rs/stop-token">
+      API Docs
+    </a>
+    <span> | </span>
+    <a href="https://github.com/async-rs/stop-token/releases">
+      Releases
+    </a>
+    <span> | </span>
+    <a href="https://github.com/async-rs/stop-token/blob/master.github/CONTRIBUTING.md">
+      Contributing
+    </a>
+  </h3>
+</div>
 
 See crate docs for details
-
 
 You can use this crate to create a deadline received through a `StopToken`:
 

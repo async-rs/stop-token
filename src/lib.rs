@@ -1,4 +1,4 @@
-//! Cooperative cancellation for [async-std](https://async.rs/).
+//! Cooperative cancellation for async Rust.
 //!
 //! # Status
 //!
