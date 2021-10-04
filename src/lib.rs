@@ -34,7 +34,10 @@
 //!
 //! # Usage
 //!
-//! You can use this crate to create a deadline received through a [`StopToken`]:
+//! You can use this crate to create a deadline received through a
+//! [`StopToken`]. You can think of a `StopSource` + `StopToken` as a
+//! single-producer, multi-consumer channel that receives a single message to
+//! "stop" when the producer is dropped:
 //!
 //! ```
 //! use async_std::prelude::*;
@@ -72,6 +75,7 @@
 //! Or `Duration` or `Instant` to create a [`time`]-based deadline:
 //!
 //! ```
+//! # #![allow(dead_code)]
 //! use async_std::prelude::*;
 //! use async_std::stream;
 //!
@@ -79,6 +83,9 @@
 //!
 //! use std::time::Duration;
 //!
+//! # #[cfg(feature = "tokio")]
+//! # fn main() {}
+//! # #[cfg(not(feature = "tokio"))]
 //! #[async_std::main]
 //! async fn main() {
 //!     // Create a stream that generates numbers for 100 millis.
