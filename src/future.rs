@@ -22,6 +22,8 @@ pub trait FutureExt: Future {
     }
 }
 
+impl<F: Future> FutureExt for F {}
+
 pin_project! {
     /// Run a future until it resolves, or until a deadline is hit.
     ///
