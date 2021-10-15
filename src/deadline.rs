@@ -55,7 +55,7 @@ cfg_if::cfg_if! {
     if #[cfg(all(feature = "tokio", feature = "async-io"))] {
         pin_project_lite::pin_project! {
             #[project = DeadlineKindProj]
-            #[derive(Debug)]
+            #[derive(Debug, Clone)]
             pub(crate) enum DeadlineKind {
                 StopToken{ #[pin]t: StopToken},
                 Tokio{#[pin]t: crate::tokio::Deadline},
@@ -65,7 +65,7 @@ cfg_if::cfg_if! {
     } else if #[cfg(feature = "tokio")] {
         pin_project_lite::pin_project! {
             #[project = DeadlineKindProj]
-            #[derive(Debug)]
+            #[derive(Debug, Clone)]
             pub(crate) enum DeadlineKind {
                 StopToken{ #[pin]t: StopToken},
                 Tokio{#[pin]t: crate::tokio::Deadline},
@@ -74,7 +74,7 @@ cfg_if::cfg_if! {
     } else if #[cfg(feature = "async-io")] {
         pin_project_lite::pin_project! {
             #[project = DeadlineKindProj]
-            #[derive(Debug)]
+            #[derive(Debug, Clone)]
             pub(crate) enum DeadlineKind {
                 StopToken{ #[pin]t: StopToken},
                 AsyncIo{#[pin]t: crate::async_io::Deadline},
@@ -83,10 +83,18 @@ cfg_if::cfg_if! {
     } else {
         pin_project_lite::pin_project! {
             #[project = DeadlineKindProj]
-            #[derive(Debug)]
+            #[derive(Debug, Clone)]
             pub(crate) enum DeadlineKind {
                 StopToken{ #[pin]t: StopToken},
             }
+        }
+    }
+}
+
+impl Clone for Deadline {
+    fn clone(&self) -> Self {
+        Self {
+            kind: self.kind.clone(),
         }
     }
 }
