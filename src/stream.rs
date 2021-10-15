@@ -12,12 +12,12 @@ use std::task::{Context, Poll};
 pub trait StreamExt: Stream {
     /// Applies the token to the `stream`, such that the resulting stream
     /// produces no more items once the token becomes cancelled.
-    fn until<T>(self, target: T) -> Stop<Self>
+    fn until<T>(self, target: T) -> Until<Self>
     where
         Self: Sized,
         T: Into<Deadline>,
     {
-        Stop {
+        Until {
             stream: self,
             deadline: target.into(),
         }
@@ -32,7 +32,7 @@ pin_project! {
     /// This method is returned by [`FutureExt::deadline`].
     #[must_use = "Futures do nothing unless polled or .awaited"]
     #[derive(Debug)]
-    pub struct Stop<S> {
+    pub struct Until<S> {
         #[pin]
         stream: S,
         #[pin]
@@ -40,14 +40,14 @@ pin_project! {
     }
 }
 
-impl<S> Stop<S> {
+impl<S> Until<S> {
     /// Unwraps this `Stop` stream, returning the underlying stream.
     pub fn into_inner(self) -> S {
         self.stream
     }
 }
 
-impl<S> Stream for Stop<S>
+impl<S> Stream for Until<S>
 where
     S: Stream,
 {

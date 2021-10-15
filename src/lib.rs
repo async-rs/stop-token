@@ -121,6 +121,8 @@ pub mod stream;
 
 #[cfg(any(feature = "async-io", feature = "docs"))]
 pub mod async_io;
+#[cfg(feature = "async_std")]
+pub mod async_std;
 #[cfg(feature = "tokio")]
 pub mod tokio;
 

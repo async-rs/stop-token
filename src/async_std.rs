@@ -1,14 +1,7 @@
-//! Extension methods and types for the `Future` trait.
+use async_std::task::JoinHandle;
 
-use crate::{deadline::TimedOutError, Deadline};
-use core::future::Future;
-use core::pin::Pin;
-
-use pin_project_lite::pin_project;
-use std::task::{Context, Poll};
-
-/// Extend the `Future` trait with the `until` method.
-pub trait FutureExt: Future {
+/// Extend the `Task` type `until` method.
+pub trait TaskExt {
     /// Run a future until it resolves, or until a deadline is hit.
     fn until<T>(self, target: T) -> Until<Self>
     where
@@ -17,12 +10,12 @@ pub trait FutureExt: Future {
     {
         Until {
             deadline: target.into(),
-            future: self,
+            join_handle: self,
         }
     }
 }
 
-impl<F: Future> FutureExt for F {}
+impl<T> JoinHandleExt<T> for JoinHandle<T> {}
 
 pin_project! {
     /// Run a future until it resolves, or until a deadline is hit.
@@ -32,7 +25,7 @@ pin_project! {
     #[derive(Debug)]
     pub struct Until<F> {
         #[pin]
-        future: F,
+        futur_handlee: F,
         #[pin]
         deadline: Deadline,
     }
@@ -47,9 +40,10 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         if let Poll::Ready(()) = this.deadline.poll(cx) {
+            let _fut = this.join_handle.cancel();
             return Poll::Ready(Err(TimedOutError::new()));
         }
-        match this.future.poll(cx) {
+        match this.join_handle.poll(cx) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(it) => Poll::Ready(Ok(it)),
         }
