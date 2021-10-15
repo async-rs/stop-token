@@ -35,8 +35,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Instant;
 
-use crate::IntoDeadline;
-
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -71,8 +69,8 @@ impl Future for Deadline {
     }
 }
 
-impl IntoDeadline for std::time::Duration {
-    fn into_deadline(self) -> crate::Deadline {
+impl Into<crate::Deadline> for std::time::Duration {
+    fn into(self) -> crate::Deadline {
         let instant = Instant::now() + self;
 
         let deadline = Deadline {
@@ -85,8 +83,8 @@ impl IntoDeadline for std::time::Duration {
     }
 }
 
-impl IntoDeadline for std::time::Instant {
-    fn into_deadline(self) -> crate::Deadline {
+impl Into<crate::Deadline> for std::time::Instant {
+    fn into(self) -> crate::Deadline {
         let deadline = Deadline {
             instant: self,
             delay: Timer::at(self),

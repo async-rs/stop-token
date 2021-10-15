@@ -1,6 +1,6 @@
 //! Extension methods and types for the `Stream` trait.
 
-use crate::{deadline::TimedOutError, Deadline, IntoDeadline};
+use crate::{deadline::TimedOutError, Deadline};
 use core::future::Future;
 use core::pin::Pin;
 
@@ -15,11 +15,11 @@ pub trait StreamExt: Stream {
     fn until<T>(self, target: T) -> Stop<Self>
     where
         Self: Sized,
-        T: IntoDeadline,
+        T: Into<Deadline>,
     {
         Stop {
             stream: self,
-            deadline: target.into_deadline(),
+            deadline: target.into(),
         }
     }
 }

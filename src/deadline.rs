@@ -41,14 +41,6 @@ impl fmt::Display for TimedOutError {
     }
 }
 
-/// Conversion into a deadline.
-///
-/// A deadline is a future which resolves after a certain period or event.
-pub trait IntoDeadline {
-    /// Creates a deadline from a value.
-    fn into_deadline(self) -> Deadline;
-}
-
 pin_project_lite::pin_project! {
     /// A future that times out after a duration of time.
     #[must_use = "Futures do nothing unless polled or .awaited"]
@@ -96,12 +88,6 @@ cfg_if::cfg_if! {
                 StopToken{ #[pin]t: StopToken},
             }
         }
-    }
-}
-
-impl IntoDeadline for Deadline {
-    fn into_deadline(self) -> Deadline {
-        self
     }
 }
 

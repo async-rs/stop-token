@@ -1,6 +1,6 @@
 //! Extension methods and types for the `Future` trait.
 
-use crate::{deadline::TimedOutError, Deadline, IntoDeadline};
+use crate::{deadline::TimedOutError, Deadline};
 use core::future::Future;
 use core::pin::Pin;
 
@@ -13,10 +13,10 @@ pub trait FutureExt: Future {
     fn until<T>(self, target: T) -> Stop<Self>
     where
         Self: Sized,
-        T: IntoDeadline,
+        T: Into<Deadline>,
     {
         Stop {
-            deadline: target.into_deadline(),
+            deadline: target.into(),
             future: self,
         }
     }

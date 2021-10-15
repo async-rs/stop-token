@@ -57,8 +57,8 @@ impl StopSource {
     }
 }
 
-impl super::IntoDeadline for StopToken {
-    fn into_deadline(self) -> Deadline {
+impl Into<Deadline> for StopToken {
+    fn into(self) -> Deadline {
         Deadline {
             kind: crate::deadline::DeadlineKind::StopToken { t: self },
         }
