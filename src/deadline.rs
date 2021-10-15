@@ -38,7 +38,7 @@ impl fmt::Display for TimedOutError {
 /// A deadline is a future which resolves after a certain period or event.
 pub trait IntoDeadline {
     /// Which kind of future are we turning this into?
-    type Deadline: Future<Output = ()>;
+    type Deadline: Future<Output = ()> + Clone;
 
     /// Creates a deadline from a value.
     fn into_deadline(self) -> Self::Deadline;
