@@ -101,7 +101,7 @@
 //!
 //! # Features
 //!
-//! The `time` submodule is empty when no features are enabled. To implement [`IntoDeadline`]
+//! The `time` submodule is empty when no features are enabled. To implement `Into<Deadline>`
 //! for `Instant` and `Duration` you can enable one of the following features:
 //!
 //! - `async-io`: for use with the `async-std` or `smol` runtimes.
@@ -118,12 +118,16 @@
 
 pub mod future;
 pub mod stream;
-pub mod time;
+
+#[cfg(any(feature = "async-io", feature = "docs"))]
+pub mod async_io;
+#[cfg(feature = "tokio")]
+pub mod tokio;
 
 mod deadline;
 mod stop_source;
 
-pub use deadline::{IntoDeadline, TimedOutError};
+pub use deadline::{Deadline, TimedOutError};
 pub use stop_source::{StopSource, StopToken};
 
 /// A prelude for `stop-token`.

@@ -1,6 +1,6 @@
 //! Extension methods and types for the `Stream` trait.
 
-use crate::{deadline::TimedOutError, IntoDeadline};
+use crate::{deadline::TimedOutError, Deadline};
 use core::future::Future;
 use core::pin::Pin;
 
@@ -12,14 +12,14 @@ use std::task::{Context, Poll};
 pub trait StreamExt: Stream {
     /// Applies the token to the `stream`, such that the resulting stream
     /// produces no more items once the token becomes cancelled.
-    fn until<T, D>(self, target: T) -> Stop<Self, D>
+    fn until<T>(self, target: T) -> Stop<Self>
     where
         Self: Sized,
-        T: IntoDeadline<Deadline = D>,
+        T: Into<Deadline>,
     {
         Stop {
             stream: self,
-            deadline: target.into_deadline(),
+            deadline: target.into(),
         }
     }
 }
@@ -32,25 +32,24 @@ pin_project! {
     /// This method is returned by [`FutureExt::deadline`].
     #[must_use = "Futures do nothing unless polled or .awaited"]
     #[derive(Debug)]
-    pub struct Stop<S, D> {
+    pub struct Stop<S> {
         #[pin]
         stream: S,
         #[pin]
-        deadline: D,
+        deadline: Deadline,
     }
 }
 
-impl<S, D> Stop<S, D> {
+impl<S> Stop<S> {
     /// Unwraps this `Stop` stream, returning the underlying stream.
     pub fn into_inner(self) -> S {
         self.stream
     }
 }
 
-impl<S, D> Stream for Stop<S, D>
+impl<S> Stream for Stop<S>
 where
     S: Stream,
-    D: Future<Output = ()>,
 {
     type Item = Result<S::Item, TimedOutError>;
 

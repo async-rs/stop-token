@@ -1,6 +1,6 @@
 //! Extension methods and types for the `Future` trait.
 
-use crate::{deadline::TimedOutError, IntoDeadline};
+use crate::{deadline::TimedOutError, Deadline};
 use core::future::Future;
 use core::pin::Pin;
 
@@ -10,13 +10,13 @@ use std::task::{Context, Poll};
 /// Extend the `Future` trait with the `until` method.
 pub trait FutureExt: Future {
     /// Run a future until it resolves, or until a deadline is hit.
-    fn until<T, D>(self, target: T) -> Stop<Self, D>
+    fn until<T>(self, target: T) -> Stop<Self>
     where
         Self: Sized,
-        T: IntoDeadline<Deadline = D>,
+        T: Into<Deadline>,
     {
         Stop {
-            deadline: target.into_deadline(),
+            deadline: target.into(),
             future: self,
         }
     }
@@ -30,18 +30,17 @@ pin_project! {
     /// This method is returned by [`FutureExt::deadline`].
     #[must_use = "Futures do nothing unless polled or .awaited"]
     #[derive(Debug)]
-    pub struct Stop<F, D> {
+    pub struct Stop<F> {
         #[pin]
         future: F,
         #[pin]
-        deadline: D,
+        deadline: Deadline,
     }
 }
 
-impl<F, D> Future for Stop<F, D>
+impl<F> Future for Stop<F>
 where
     F: Future,
-    D: Future<Output = ()>,
 {
     type Output = Result<F::Output, TimedOutError>;
 
