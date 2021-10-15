@@ -72,12 +72,13 @@ fn async_io_time() {
 #[cfg(feature = "tokio")]
 #[tokio::test]
 async fn tokio_time() {
+    use tokio::time::Instant;
     let (sender, receiver) = bounded::<i32>(10);
     let task = tokio::task::spawn({
         let receiver = receiver.clone();
         async move {
             let mut xs = Vec::new();
-            let mut stream = receiver.until(Duration::from_millis(200));
+            let mut stream = receiver.until(Instant::now() + Duration::from_millis(200));
             while let Some(Ok(x)) = stream.next().await {
                 xs.push(x)
             }

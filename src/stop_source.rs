@@ -5,6 +5,8 @@ use core::task::{Context, Poll};
 use async_channel::{bounded, Receiver, Sender};
 use futures_core::stream::Stream;
 
+use crate::Deadline;
+
 enum Never {}
 
 /// `StopSource` produces `StopToken` and cancels all of its tokens on drop.
@@ -56,10 +58,10 @@ impl StopSource {
 }
 
 impl super::IntoDeadline for StopToken {
-    type Deadline = Self;
-
-    fn into_deadline(self) -> Self::Deadline {
-        self
+    fn into_deadline(self) -> Deadline {
+        Deadline {
+            kind: crate::deadline::DeadlineKind::StopToken { t: self },
+        }
     }
 }
 

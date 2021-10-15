@@ -43,7 +43,7 @@ pin_project! {
     /// A future that times out after a duration of time.
     #[must_use = "Futures do nothing unless polled or .awaited"]
     #[derive(Debug)]
-    pub struct Deadline {
+    pub(crate) struct Deadline {
         instant: Instant,
         #[pin]
         delay: Timer,
@@ -72,24 +72,27 @@ impl Future for Deadline {
 }
 
 impl IntoDeadline for std::time::Duration {
-    type Deadline = Deadline;
-
-    fn into_deadline(self) -> Self::Deadline {
+    fn into_deadline(self) -> crate::Deadline {
         let instant = Instant::now() + self;
-        Deadline {
+
+        let deadline = Deadline {
             instant,
             delay: Timer::after(self),
+        };
+        crate::Deadline {
+            kind: crate::deadline::DeadlineKind::AsyncIo { t: deadline },
         }
     }
 }
 
 impl IntoDeadline for std::time::Instant {
-    type Deadline = Deadline;
-
-    fn into_deadline(self) -> Self::Deadline {
-        Deadline {
+    fn into_deadline(self) -> crate::Deadline {
+        let deadline = Deadline {
             instant: self,
             delay: Timer::at(self),
+        };
+        crate::Deadline {
+            kind: crate::deadline::DeadlineKind::AsyncIo { t: deadline },
         }
     }
 }

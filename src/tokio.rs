@@ -9,37 +9,18 @@
 //! - `tokio`: use this when using the `tokio` runtime.
 //!
 //! # Examples
-//!
-//! ```
-//! use std::time::Instant;
-//! use async_std::prelude::*;
-//! use stop_token::prelude::*;
-//! use stop_token::StopToken;
-//!
-//! struct Event;
-//!
-//! async fn do_work(work: impl Stream<Item = Event> + Unpin, until: Instant) {
-//!     let mut work = work.until(until);
-//!     while let Some(Ok(event)) = work.next().await {
-//!         process_event(event).await
-//!     }
-//! }
-//!
-//! async fn process_event(_event: Event) {
-//! }
-//! ```
 
 use std::future::{pending, Future, Pending};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio::time::{timeout, timeout_at, Instant as TokioInstant, Timeout};
+use tokio::time::{timeout_at, Instant as TokioInstant, Timeout};
 
 use crate::IntoDeadline;
 
 /// A future that times out after a duration of time.
 #[must_use = "Futures do nothing unless polled or .awaited"]
 #[derive(Debug)]
-pub struct Deadline {
+pub(crate) struct Deadline {
     instant: TokioInstant,
     delay: Pin<Box<Timeout<Pending<()>>>>,
 }
@@ -65,26 +46,16 @@ impl Future for Deadline {
     }
 }
 
-impl IntoDeadline for std::time::Duration {
-    type Deadline = Deadline;
-
-    fn into_deadline(self) -> Self::Deadline {
-        let instant = std::time::Instant::now() + self;
-        Deadline {
-            instant: instant.into(),
-            delay: Box::pin(timeout(self, pending())),
-        }
-    }
-}
-
-impl IntoDeadline for std::time::Instant {
-    type Deadline = Deadline;
-
-    fn into_deadline(self) -> Self::Deadline {
+impl IntoDeadline for tokio::time::Instant {
+    fn into_deadline(self) -> crate::Deadline {
         let instant = TokioInstant::from(self);
-        Deadline {
+        let deadline = Deadline {
             instant,
             delay: Box::pin(timeout_at(instant, pending())),
+        };
+
+        crate::Deadline {
+            kind: crate::deadline::DeadlineKind::Tokio { t: deadline },
         }
     }
 }

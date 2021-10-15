@@ -127,7 +127,7 @@ pub mod tokio;
 mod deadline;
 mod stop_source;
 
-pub use deadline::{IntoDeadline, TimedOutError};
+pub use deadline::{Deadline, IntoDeadline, TimedOutError};
 pub use stop_source::{StopSource, StopToken};
 
 /// A prelude for `stop-token`.
