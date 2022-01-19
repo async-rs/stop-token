@@ -43,13 +43,14 @@ fn smoke() {
 #[cfg(feature = "async-io")]
 #[test]
 fn async_io_time() {
+    use std::time::Instant;
     task::block_on(async {
         let (sender, receiver) = bounded::<i32>(10);
         let task = task::spawn({
             let receiver = receiver.clone();
             async move {
                 let mut xs = Vec::new();
-                let mut stream = receiver.timeout_at(Duration::from_millis(200));
+                let mut stream = receiver.timeout_at(Instant::now() + Duration::from_millis(200));
                 while let Some(Ok(x)) = stream.next().await {
                     xs.push(x)
                 }

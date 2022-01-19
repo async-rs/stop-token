@@ -1,9 +1,9 @@
-//! Create deadlines from `Duration` and `Instant` types.
+//! Create deadlines from `Instant`.
 //!
 //! # Features
 //!
 //! This module is empty when no features are enabled. To implement deadlines
-//! for `Instant` and `Duration` you can enable one of the following features:
+//! for `Instant` you can enable one of the following features:
 //!
 //! - `async-io`: use this when using the `async-std` or `smol` runtimes.
 //! - `tokio`: use this when using the `tokio` runtime.
@@ -65,20 +65,6 @@ impl Future for Deadline {
         match this.delay.poll(cx) {
             Poll::Ready(_) => Poll::Ready(()),
             Poll::Pending => Poll::Pending,
-        }
-    }
-}
-
-impl Into<crate::Deadline> for std::time::Duration {
-    fn into(self) -> crate::Deadline {
-        let instant = Instant::now() + self;
-
-        let deadline = Deadline {
-            instant,
-            delay: Timer::after(self),
-        };
-        crate::Deadline {
-            kind: crate::deadline::DeadlineKind::AsyncIo { t: deadline },
         }
     }
 }

@@ -1,4 +1,4 @@
-//! Create deadlines from `Duration` and `Instant` types.
+//! Create deadlines from `Instant`.
 //!
 //! # Features
 //!

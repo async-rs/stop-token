@@ -72,7 +72,7 @@
 //! }
 //! ```
 //!
-//! Or `Duration` or `Instant` to create a `time`-based deadline:
+//! Or `Instant` to create a `time`-based deadline:
 //!
 //! ```
 //! # #![allow(dead_code)]
@@ -81,7 +81,7 @@
 //!
 //! use stop_token::prelude::*;
 //!
-//! use std::time::Duration;
+//! use std::time::{Duration, Instant};
 //!
 //! # #[cfg(feature = "tokio")]
 //! # fn main() {}
@@ -89,7 +89,7 @@
 //! #[async_std::main]
 //! async fn main() {
 //!     // Create a stream that generates numbers for 100 millis.
-//!     let stop = Duration::from_millis(100);
+//!     let stop = Instant::now() + Duration::from_millis(100);
 //!     let mut work = stream::repeat(12u8).timeout_at(stop);
 //!
 //!     // Loop over each item in the stream.
@@ -102,7 +102,7 @@
 //! # Features
 //!
 //! The `time` submodule is empty when no features are enabled. To implement `Into<Deadline>`
-//! for `Instant` and `Duration` you can enable one of the following features:
+//! for `Instant` you can enable one of the following features:
 //!
 //! - `async-io`: for use with the `async-std` or `smol` runtimes.
 //! - `tokio`: for use with the `tokio` runtime.

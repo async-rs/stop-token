@@ -78,7 +78,7 @@ async fn main() {
 }
 ```
 
-Or `Duration` or `Instant` to create a `time`-based deadline:
+Or `Instant` to create a `time`-based deadline:
 
 ```rust
 use async_std::prelude::*;
@@ -86,12 +86,12 @@ use async_std::stream;
 
 use stop_token::prelude::*;
 
-use std::time::Duration;
+use std::time::{Instant, Duration};
 
 #[async_std::main]
 async fn main() {
     // Create a stream that generates numbers for 100 millis.
-    let deadline = Duration::from_millis(100);
+    let deadline = Instant::now() + Duration::from_millis(100);
     let mut work = stream::repeat(12u8).timeout_at(deadline);
 
     // Loop over each item in the stream.
