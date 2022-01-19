@@ -18,7 +18,7 @@ fn smoke() {
             let receiver = receiver.clone();
             async move {
                 let mut xs = Vec::new();
-                let mut stream = receiver.until(token);
+                let mut stream = receiver.timeout_at(token);
                 while let Some(Ok(x)) = stream.next().await {
                     xs.push(x)
                 }
@@ -49,7 +49,7 @@ fn async_io_time() {
             let receiver = receiver.clone();
             async move {
                 let mut xs = Vec::new();
-                let mut stream = receiver.until(Duration::from_millis(200));
+                let mut stream = receiver.timeout_at(Duration::from_millis(200));
                 while let Some(Ok(x)) = stream.next().await {
                     xs.push(x)
                 }
@@ -78,7 +78,7 @@ async fn tokio_time() {
         let receiver = receiver.clone();
         async move {
             let mut xs = Vec::new();
-            let mut stream = receiver.until(Instant::now() + Duration::from_millis(200));
+            let mut stream = receiver.timeout_at(Instant::now() + Duration::from_millis(200));
             while let Some(Ok(x)) = stream.next().await {
                 xs.push(x)
             }

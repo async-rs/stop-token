@@ -63,7 +63,7 @@
 //!
 //!     // Create a stream that generates numbers until
 //!     // it receives a signal it needs to stop.
-//!     let mut work = stream::repeat(12u8).until(stop);
+//!     let mut work = stream::repeat(12u8).timeout_at(stop);
 //!
 //!     // Loop over each item in the stream.
 //!     while let Some(Ok(ev)) = work.next().await {
@@ -72,7 +72,7 @@
 //! }
 //! ```
 //!
-//! Or `Duration` or `Instant` to create a [`time`]-based deadline:
+//! Or `Duration` or `Instant` to create a `time`-based deadline:
 //!
 //! ```
 //! # #![allow(dead_code)]
@@ -90,7 +90,7 @@
 //! async fn main() {
 //!     // Create a stream that generates numbers for 100 millis.
 //!     let stop = Duration::from_millis(100);
-//!     let mut work = stream::repeat(12u8).until(stop);
+//!     let mut work = stream::repeat(12u8).timeout_at(stop);
 //!
 //!     // Loop over each item in the stream.
 //!     while let Some(Ok(ev)) = work.next().await {

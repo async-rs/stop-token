@@ -10,12 +10,12 @@ use std::task::{Context, Poll};
 /// Extend the `Future` trait with the `until` method.
 pub trait FutureExt: Future {
     /// Run a future until it resolves, or until a deadline is hit.
-    fn until<T>(self, target: T) -> Until<Self>
+    fn timeout_at<T>(self, target: T) -> TimeoutAt<Self>
     where
         Self: Sized,
         T: Into<Deadline>,
     {
-        Until {
+        TimeoutAt {
             deadline: target.into(),
             future: self,
         }
@@ -30,7 +30,7 @@ pin_project! {
     /// This method is returned by [`FutureExt::deadline`].
     #[must_use = "Futures do nothing unless polled or .awaited"]
     #[derive(Debug)]
-    pub struct Until<F> {
+    pub struct TimeoutAt<F> {
         #[pin]
         future: F,
         #[pin]
@@ -38,7 +38,7 @@ pin_project! {
     }
 }
 
-impl<F> Future for Until<F>
+impl<F> Future for TimeoutAt<F>
 where
     F: Future,
 {

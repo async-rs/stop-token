@@ -58,7 +58,7 @@ use std::time::Duration;
 async fn main() {
     // Create a stop source and generate a token.
     let src = StopSource::new();
-    let stop = src.token();
+    let deadline = src.token();
 
     // When stop source is dropped, the loop will stop.
     // Move the source to a task, and drop it after 100 millis.
@@ -69,7 +69,7 @@ async fn main() {
 
     // Create a stream that generates numbers until
     // it receives a signal it needs to stop.
-    let mut work = stream::repeat(12u8).until(stop);
+    let mut work = stream::repeat(12u8).timeout_at(deadline);
 
     // Loop over each item in the stream.
     while let Some(Ok(ev)) = work.next().await {
@@ -91,8 +91,8 @@ use std::time::Duration;
 #[async_std::main]
 async fn main() {
     // Create a stream that generates numbers for 100 millis.
-    let stop = Duration::from_millis(100);
-    let mut work = stream::repeat(12u8).until(stop);
+    let deadline = Duration::from_millis(100);
+    let mut work = stream::repeat(12u8).timeout_at(deadline);
 
     // Loop over each item in the stream.
     while let Some(Ok(ev)) = work.next().await {

@@ -18,8 +18,8 @@
 //!
 //! struct Event;
 //!
-//! async fn do_work(work: impl Stream<Item = Event> + Unpin, until: Instant) {
-//!     let mut work = work.until(until);
+//! async fn do_work(work: impl Stream<Item = Event> + Unpin, deadline: Instant) {
+//!     let mut work = work.timeout_at(deadline);
 //!     while let Some(Ok(event)) = work.next().await {
 //!         process_event(event).await
 //!     }
